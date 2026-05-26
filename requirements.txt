@@ -1,0 +1,36 @@
+# Web 框架
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12
+
+# 数据库
+sqlalchemy[asyncio]>=2.0.36
+asyncpg>=0.30.0
+alembic>=1.14.0
+pgvector>=0.3.6
+
+# LangChain
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
+
+# 文档解析
+pypdf>=5.1.0
+
+# 配置
+pydantic-settings>=2.6.0
+python-dotenv>=1.0.1
+
+# 密码哈希
+bcrypt>=4.2.0
+
+# JWT 认证
+PyJWT>=2.8.0
+
+# API 限流
+slowapi>=0.1.9
+
+# 嵌入模型
+sentence-transformers>=3.0.0

@@ -1,0 +1,1774 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG 智能问答系统</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #6366f1;
+            --primary-dark: #3730a3;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --surface-alt: #f1f5f9;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-secondary: #64748b;
+            --text-muted: #94a3b8;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ===== Layout ===== */
+        .app {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            font-size: 24px;
+            line-height: 1;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .header-badge {
+            font-size: 11px;
+            background: var(--primary);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: var(--surface-alt);
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .user-chip .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+        }
+
+        .btn-logout {
+            background: none;
+            border: 1px solid var(--border);
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-logout:hover {
+            background: var(--surface-alt);
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        /* ===== Main Content ===== */
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ===== Sidebar ===== */
+        .sidebar {
+            width: 320px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-section {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        /* Upload area */
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 24px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--surface-alt);
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary);
+            background: #eef2ff;
+        }
+
+        .upload-zone.has-file {
+            border-color: var(--success);
+            background: #ecfdf5;
+            border-style: solid;
+        }
+
+        .upload-zone .upload-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .upload-zone h4 {
+            font-size: 14px;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+
+        .upload-zone p {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .file-selected {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: var(--surface);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+        }
+
+        .file-selected .file-icon { font-size: 16px; }
+        .file-selected .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+        .file-selected .file-remove {
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 16px;
+            line-height: 1;
+        }
+        .file-selected .file-remove:hover { color: var(--danger); }
+
+        .btn-upload {
+            width: 100%;
+            margin-top: 12px;
+            padding: 10px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-upload:hover:not(:disabled) {
+            background: var(--primary-dark);
+        }
+
+        .btn-upload:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Upload progress */
+        .upload-progress {
+            margin-top: 12px;
+            display: none;
+        }
+
+        .upload-progress.active { display: block; }
+
+        .progress-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .progress-step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-muted);
+            transition: color 0.2s;
+        }
+
+        .progress-step.active { color: var(--primary); font-weight: 500; }
+        .progress-step.done { color: var(--success); }
+
+        .progress-step .step-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            flex-shrink: 0;
+            background: var(--surface-alt);
+            transition: all 0.2s;
+        }
+
+        .progress-step.active .step-icon {
+            background: var(--primary);
+            color: white;
+        }
+
+        .progress-step.done .step-icon {
+            background: var(--success);
+            color: white;
+        }
+
+        /* Document list */
+        .doc-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .doc-list::-webkit-scrollbar { width: 4px; }
+        .doc-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        .doc-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: background 0.15s;
+            margin-bottom: 2px;
+        }
+
+        .doc-item:hover { background: var(--surface-alt); }
+
+        .doc-item .doc-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .doc-item .doc-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .doc-item .doc-title {
+            font-size: 13px;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .doc-item .doc-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .doc-item .btn-delete-doc {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.15s;
+            opacity: 0;
+        }
+
+        .doc-item:hover .btn-delete-doc {
+            opacity: 1;
+        }
+
+        .doc-item .btn-delete-doc:hover {
+            color: var(--danger);
+            background: #fee2e2;
+        }
+
+        /* Preview Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--surface);
+            border-radius: var(--radius);
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 4px;
+        }
+
+        .modal-close:hover {
+            color: var(--text);
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .preview-chunk {
+            padding: 12px;
+            background: var(--surface-alt);
+            border-radius: var(--radius-sm);
+            margin-bottom: 12px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .preview-chunk:last-child {
+            margin-bottom: 0;
+        }
+
+        .preview-chunk-header {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .doc-empty {
+            text-align: center;
+            padding: 24px 16px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .doc-empty .empty-icon {
+            font-size: 36px;
+            margin-bottom: 8px;
+            opacity: 0.5;
+        }
+
+        /* ===== Chat Area ===== */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .chat-messages::-webkit-scrollbar { width: 6px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        /* Welcome */
+        .welcome {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .welcome .welcome-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .welcome h2 {
+            font-size: 22px;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .welcome p {
+            font-size: 14px;
+            max-width: 400px;
+            line-height: 1.6;
+        }
+
+        .welcome .tips {
+            margin-top: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .welcome .tip {
+            padding: 8px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .welcome .tip:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: #eef2ff;
+        }
+
+        /* Messages */
+        .message {
+            display: flex;
+            gap: 12px;
+            max-width: 85%;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user { align-self: flex-end; flex-direction: row-reverse; }
+        .message.bot { align-self: flex-start; }
+
+        .msg-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .message.user .msg-avatar { background: var(--primary); }
+        .message.bot .msg-avatar { background: var(--surface-alt); }
+
+        .msg-body {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .msg-content {
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            line-height: 1.7;
+            font-size: 14px;
+            word-break: break-word;
+        }
+
+        .message.user .msg-content {
+            background: var(--primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.bot .msg-content {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+            box-shadow: var(--shadow);
+        }
+
+        .msg-content p { margin-bottom: 8px; }
+        .msg-content p:last-child { margin-bottom: 0; }
+        .msg-content code {
+            background: rgba(0,0,0,0.06);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .msg-content pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+        .msg-content pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+        .msg-content ul, .msg-content ol {
+            padding-left: 20px;
+            margin: 8px 0;
+        }
+        .msg-content li { margin-bottom: 4px; }
+        .msg-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 8px 0;
+        }
+        .msg-content th, .msg-content td {
+            border: 1px solid var(--border);
+            padding: 6px 10px;
+            text-align: left;
+            font-size: 13px;
+        }
+        .msg-content th { background: var(--surface-alt); }
+
+        /* Sources panel */
+        .sources-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+        }
+
+        .sources-toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: background 0.15s;
+        }
+
+        .sources-toggle:hover { background: var(--surface-alt); }
+
+        .sources-toggle .arrow {
+            transition: transform 0.2s;
+            font-size: 12px;
+        }
+
+        .sources-toggle.open .arrow { transform: rotate(180deg); }
+
+        .sources-list {
+            display: none;
+            border-top: 1px solid var(--border);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .sources-list.open { display: block; }
+
+        .source-item {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .source-item:last-child { border-bottom: none; }
+
+        .source-item .source-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 12px;
+        }
+
+        .source-item .source-text {
+            color: var(--text);
+            font-size: 13px;
+        }
+
+        /* Typing indicator */
+        .typing {
+            display: flex;
+            gap: 4px;
+            padding: 12px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            width: fit-content;
+        }
+
+        .typing span {
+            width: 6px;
+            height: 6px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .typing span:nth-child(1) { animation-delay: 0s; }
+        .typing span:nth-child(2) { animation-delay: 0.2s; }
+        .typing span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Input area */
+        .chat-input-area {
+            padding: 16px 24px;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            max-width: 100%;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            transition: border-color 0.15s;
+            min-height: 44px;
+            max-height: 120px;
+            line-height: 1.5;
+        }
+
+        .chat-input:focus { border-color: var(--primary); }
+
+        .chat-input::placeholder { color: var(--text-muted); }
+
+        .btn-send {
+            width: 44px;
+            height: 44px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+
+        .btn-send:hover:not(:disabled) { background: var(--primary-dark); }
+
+        .btn-send:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .chat-hint {
+            text-align: center;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        /* ===== Login Page ===== */
+        .login-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+
+        .login-card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-header .login-logo {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .login-header h1 {
+            font-size: 24px;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+
+        .login-header p {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .form-field {
+            margin-bottom: 20px;
+        }
+
+        .form-field label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .form-field input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.15s;
+            font-family: inherit;
+        }
+
+        .form-field input:focus { border-color: var(--primary); }
+
+        .btn-login {
+            width: 100%;
+            padding: 13px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-login:hover:not(:disabled) { background: var(--primary-dark); }
+
+        .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .login-footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .login-footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* ===== Toast ===== */
+        .toast-container {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 12px 20px;
+            border-radius: var(--radius-sm);
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: var(--shadow-lg);
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 360px;
+        }
+
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .toast.info { background: var(--primary); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* ===== Spinner ===== */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ===== Hidden ===== */
+        .hidden { display: none !important; }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); max-height: 40vh; }
+            .main { flex-direction: column; }
+            .message { max-width: 95%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login / Register Page -->
+    <div class="login-page" id="loginPage">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo">📚</div>
+                <h1>RAG 智能问答系统</h1>
+                <p>上传文档，基于内容智能问答</p>
+            </div>
+
+            <!-- 登录表单 -->
+            <form id="loginForm">
+                <div class="form-field">
+                    <label for="loginUsername">用户名</label>
+                    <input type="text" id="loginUsername" placeholder="输入用户名" autocomplete="username">
+                </div>
+                <div class="form-field">
+                    <label for="loginPassword">密码</label>
+                    <input type="password" id="loginPassword" placeholder="输入密码" autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-login" id="loginBtn">登录</button>
+            </form>
+
+            <!-- 注册表单 -->
+            <form id="registerForm" class="hidden">
+                <div class="form-field">
+                    <label for="regUsername">用户名</label>
+                    <input type="text" id="regUsername" placeholder="2-128 个字符" autocomplete="username">
+                </div>
+                <div class="form-field">
+                    <label for="regPassword">密码</label>
+                    <input type="password" id="regPassword" placeholder="至少 6 位" autocomplete="new-password">
+                </div>
+                <div class="form-field">
+                    <label for="regPassword2">确认密码</label>
+                    <input type="password" id="regPassword2" placeholder="再次输入密码" autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn-login" id="registerBtn">注册</button>
+            </form>
+
+            <div class="login-footer" id="loginFooter">
+                还没有账号？<a href="#" id="showRegister">立即注册</a>
+            </div>
+            <div class="login-footer hidden" id="registerFooter">
+                已有账号？<a href="#" id="showLogin">去登录</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- App -->
+    <div class="app hidden" id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <span class="header-logo">📚</span>
+                <span class="header-title">RAG 智能问答</span>
+                <span class="header-badge">V1.0</span>
+            </div>
+            <div class="header-right">
+                <div class="user-chip">
+                    <span class="dot"></span>
+                    <span id="headerUser">admin</span>
+                </div>
+                <button class="btn-logout" id="logoutBtn">退出</button>
+            </div>
+        </header>
+
+        <!-- Main -->
+        <div class="main">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <!-- Upload -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">上传文档</div>
+                    <div class="upload-zone" id="uploadZone">
+                        <div class="upload-icon">📄</div>
+                        <h4>点击或拖拽上传</h4>
+                        <p>支持 .txt / .pdf 格式</p>
+                        <div class="file-selected hidden" id="fileSelected">
+                            <span class="file-icon">📎</span>
+                            <span class="file-name" id="fileName"></span>
+                            <span class="file-remove" id="fileRemove">✕</span>
+                        </div>
+                    </div>
+                    <button class="btn-upload" id="uploadBtn" disabled>
+                        选择文件后上传
+                    </button>
+                    <div class="upload-progress" id="uploadProgress">
+                        <div class="progress-steps">
+                            <div class="progress-step" id="stepParse">
+                                <span class="step-icon">1</span>
+                                <span>解析文档内容...</span>
+                            </div>
+                            <div class="progress-step" id="stepChunk">
+                                <span class="step-icon">2</span>
+                                <span>文本切分 (Chunk)...</span>
+                            </div>
+                            <div class="progress-step" id="stepEmbed">
+                                <span class="step-icon">3</span>
+                                <span>向量化 (Embedding)...</span>
+                            </div>
+                            <div class="progress-step" id="stepSave">
+                                <span class="step-icon">4</span>
+                                <span>写入数据库...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="file" id="fileInput" accept=".txt,.pdf" hidden>
+                </div>
+
+                <!-- Document List -->
+                <div class="sidebar-section" style="flex:1; display:flex; flex-direction:column; border-bottom:none;">
+                    <div class="sidebar-section-title">
+                        已上传文档
+                        <span id="docCount" style="float:right; color:var(--primary);"></span>
+                    </div>
+                    <div class="doc-list" id="docList">
+                        <div class="doc-empty">
+                            <div class="empty-icon">📂</div>
+                            <div>暂无文档</div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Chat -->
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="welcome" id="welcomeScreen">
+                        <div class="welcome-icon">💬</div>
+                        <h2>开始智能问答</h2>
+                        <p>上传文档后，基于文档内容进行智能问答。系统会自动检索最相关的片段，并生成回答。</p>
+                        <div class="tips">
+                            <span class="tip" data-q="请总结这份文档的主要内容">总结文档内容</span>
+                            <span class="tip" data-q="文档中提到了哪些关键概念？">提取关键概念</span>
+                            <span class="tip" data-q="请用简洁的语言概括核心观点">概括核心观点</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-area">
+                    <div class="chat-input-wrapper">
+                        <textarea class="chat-input" id="chatInput" placeholder="输入问题，基于已上传的文档进行问答..." rows="1" disabled></textarea>
+                        <button class="btn-send" id="sendBtn" disabled title="发送">➤</button>
+                    </div>
+                    <div class="chat-hint">按 Enter 发送，Shift + Enter 换行</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+    // ===== State =====
+    const state = {
+        tenantId: '',
+        userId: 0,
+        username: '',
+        token: '',
+        selectedFile: null,
+        documents: [],
+        chatHistory: [],
+    };
+
+    // ===== Auth Helper =====
+    async function authFetch(url, options = {}) {
+        const headers = { ...options.headers };
+        if (state.token) {
+            headers['Authorization'] = `Bearer ${state.token}`;
+        }
+        if (state.tenantId) {
+            headers['X-Tenant-ID'] = state.tenantId;
+        }
+        const resp = await fetch(url, { ...options, headers });
+        if (resp.status === 401) {
+            clearSession();
+            toast('登录已过期，请重新登录', 'error');
+            throw new Error('Unauthorized');
+        }
+        return resp;
+    }
+
+    function clearSession() {
+        state.token = '';
+        state.userId = 0;
+        state.username = '';
+        state.tenantId = '';
+        state.selectedFile = null;
+        state.documents = [];
+        state.chatHistory = [];
+        localStorage.removeItem('rag_token');
+        localStorage.removeItem('rag_username');
+        loginPage.classList.remove('hidden');
+        app.classList.add('hidden');
+        resetUpload();
+        resetChat();
+    }
+
+    // ===== DOM =====
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => document.querySelectorAll(sel);
+
+    const loginPage = $('#loginPage');
+    const app = $('#app');
+    const loginForm = $('#loginForm');
+    const loginBtn = $('#loginBtn');
+    const registerForm = $('#registerForm');
+    const registerBtn = $('#registerBtn');
+    const logoutBtn = $('#logoutBtn');
+    const headerUser = $('#headerUser');
+
+    const uploadZone = $('#uploadZone');
+    const fileInput = $('#fileInput');
+    const fileSelected = $('#fileSelected');
+    const fileNameEl = $('#fileName');
+    const fileRemove = $('#fileRemove');
+    const uploadBtn = $('#uploadBtn');
+    const uploadProgress = $('#uploadProgress');
+    const docList = $('#docList');
+    const docCount = $('#docCount');
+
+    const chatMessages = $('#chatMessages');
+    const welcomeScreen = $('#welcomeScreen');
+    const chatInput = $('#chatInput');
+    const sendBtn = $('#sendBtn');
+
+    const toastContainer = $('#toastContainer');
+
+    // ===== Toast =====
+    function toast(msg, type = 'info') {
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.innerHTML = `<span>${msg}</span>`;
+        toastContainer.appendChild(el);
+        setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(100%)'; el.style.transition = 'all 0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
+    }
+
+    // ===== Login / Register Toggle =====
+    const showRegister = $('#showRegister');
+    const showLogin = $('#showLogin');
+    const loginFooter = $('#loginFooter');
+    const registerFooter = $('#registerFooter');
+
+    showRegister.addEventListener('click', (e) => {
+        e.preventDefault();
+        loginForm.classList.add('hidden');
+        registerForm.classList.remove('hidden');
+        loginFooter.classList.add('hidden');
+        registerFooter.classList.remove('hidden');
+    });
+
+    showLogin.addEventListener('click', (e) => {
+        e.preventDefault();
+        registerForm.classList.add('hidden');
+        loginForm.classList.remove('hidden');
+        registerFooter.classList.add('hidden');
+        loginFooter.classList.remove('hidden');
+    });
+
+    // ===== Login =====
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = $('#loginUsername').value.trim();
+        const password = $('#loginPassword').value;
+        if (!username || !password) { toast('请填写用户名和密码', 'error'); return; }
+
+        loginBtn.disabled = true;
+        loginBtn.innerHTML = '<span class="spinner"></span> 登录中...';
+
+        try {
+            const resp = await fetch('/api/v1/users/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                const msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail || data);
+                throw new Error(msg || '登录失败');
+            }
+
+            state.tenantId = 'default';
+            state.userId = data.user_id;
+            state.username = data.username;
+            state.token = data.token;
+
+            localStorage.setItem('rag_token', data.token);
+            localStorage.setItem('rag_username', data.username);
+
+            showApp(data.username);
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            loginBtn.disabled = false;
+            loginBtn.textContent = '登录';
+        }
+    });
+
+    // ===== Register =====
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = $('#regUsername').value.trim();
+        const password = $('#regPassword').value;
+        const password2 = $('#regPassword2').value;
+
+        if (!username || !password) { toast('请填写用户名和密码', 'error'); return; }
+        if (password.length < 6) { toast('密码至少需要 6 位', 'error'); return; }
+        if (password !== password2) { toast('两次输入的密码不一致', 'error'); return; }
+
+        registerBtn.disabled = true;
+        registerBtn.innerHTML = '<span class="spinner"></span> 注册中...';
+
+        try {
+            const resp = await fetch('/api/v1/users/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                const msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail || data);
+                throw new Error(msg || '注册失败');
+            }
+
+            // 注册成功，直接登录
+            state.tenantId = 'default';
+            state.userId = data.user_id;
+            state.username = data.username;
+            state.token = data.token;
+
+            localStorage.setItem('rag_token', data.token);
+            localStorage.setItem('rag_username', data.username);
+
+            showApp(data.username);
+            toast('注册成功', 'success');
+        } catch (err) {
+            toast(err.message, 'error');
+        } finally {
+            registerBtn.disabled = false;
+            registerBtn.textContent = '注册';
+        }
+    });
+
+    logoutBtn.addEventListener('click', () => {
+        clearSession();
+    });
+
+    // ===== File Upload =====
+    uploadZone.addEventListener('click', () => fileInput.click());
+    fileRemove.addEventListener('click', (e) => { e.stopPropagation(); resetUpload(); });
+
+    uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleFileSelect(e.dataTransfer.files[0]);
+    });
+
+    fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFileSelect(fileInput.files[0]); });
+
+    function handleFileSelect(file) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext !== 'txt' && ext !== 'pdf') { toast('仅支持 .txt / .pdf 文件', 'error'); return; }
+        state.selectedFile = file;
+        fileNameEl.textContent = file.name;
+        fileSelected.classList.remove('hidden');
+        uploadZone.classList.add('has-file');
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = '上传并处理';
+    }
+
+    function resetUpload() {
+        state.selectedFile = null;
+        fileInput.value = '';
+        fileSelected.classList.add('hidden');
+        uploadZone.classList.remove('has-file');
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = '选择文件后上传';
+        uploadProgress.classList.remove('active');
+        $$('.progress-step').forEach(s => { s.classList.remove('active', 'done'); s.querySelector('.step-icon').textContent = ['1','2','3','4'][Array.from($$('.progress-step')).indexOf(s)]; });
+    }
+
+    uploadBtn.addEventListener('click', async () => {
+        if (!state.selectedFile) { fileInput.click(); return; }
+
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<span class="spinner"></span> 处理中...';
+        uploadProgress.classList.add('active');
+
+        // Animate steps
+        const steps = ['stepParse', 'stepChunk', 'stepEmbed', 'stepSave'];
+        let currentStep = 0;
+        function advanceStep() {
+            if (currentStep > 0) {
+                const prev = $(`#${steps[currentStep - 1]}`);
+                prev.classList.remove('active');
+                prev.classList.add('done');
+                prev.querySelector('.step-icon').textContent = '✓';
+            }
+            if (currentStep < steps.length) {
+                $(`#${steps[currentStep]}`).classList.add('active');
+                currentStep++;
+            }
+        }
+        advanceStep(); // Step 1: Parse
+
+        const formData = new FormData();
+        formData.append('file', state.selectedFile);
+
+        try {
+            const resp = await authFetch('/api/v1/documents/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            // Simulate progress
+            advanceStep(); // Step 2
+            await new Promise(r => setTimeout(r, 300));
+            advanceStep(); // Step 3
+            await new Promise(r => setTimeout(r, 300));
+            advanceStep(); // Step 4
+
+            let data;
+            try {
+                data = await resp.json();
+            } catch (e) {
+                throw new Error(`服务器错误 (${resp.status})`);
+            }
+            if (!resp.ok) {
+                const msg = typeof data.detail === 'string'
+                    ? data.detail
+                    : JSON.stringify(data.detail || data);
+                throw new Error(msg || `上传失败 (${resp.status})`);
+            }
+
+            // Mark all done
+            steps.forEach(id => {
+                const el = $(`#${id}`);
+                el.classList.remove('active');
+                el.classList.add('done');
+                el.querySelector('.step-icon').textContent = '✓';
+            });
+
+            toast(`上传成功！已切分为 ${data.chunk_count} 个片段并完成向量化`, 'success');
+            addDocument({ document_id: data.document_id, title: data.title, source_type: data.source_type, chunk_count: data.chunk_count, created_at: new Date().toISOString() });
+
+            chatInput.disabled = false;
+            sendBtn.disabled = false;
+
+            setTimeout(() => { resetUpload(); }, 1500);
+            loadDocuments();
+        } catch (err) {
+            toast(err.message, 'error');
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = '重新上传';
+        }
+    });
+
+    // ===== Documents =====
+    async function loadDocuments() {
+        try {
+            const resp = await authFetch('/api/v1/documents/list');
+            if (!resp.ok) throw new Error('加载失败');
+            const data = await resp.json();
+            state.documents = data;
+            updateDocList();
+
+            // Enable chat if docs exist
+            if (data.length > 0) {
+                chatInput.disabled = false;
+                sendBtn.disabled = false;
+            }
+        } catch (err) {
+            if (err.message !== 'Unauthorized') console.error('Load documents error:', err);
+        }
+    }
+
+    function addDocument(doc) {
+        state.documents.unshift(doc);
+        updateDocList();
+    }
+
+    function updateDocList() {
+        if (state.documents.length === 0) {
+            docList.innerHTML = '<div class="doc-empty"><div class="empty-icon">📂</div><div>暂无文档，请上传 .txt 或 .pdf 文件</div></div>';
+            docCount.textContent = '';
+            return;
+        }
+        docCount.textContent = state.documents.length;
+        docList.innerHTML = state.documents.map(doc => {
+            const date = doc.created_at ? new Date(doc.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+            return `
+            <div class="doc-item" data-id="${doc.document_id}">
+                <span class="doc-icon">${doc.source_type === 'pdf' ? '📕' : '📄'}</span>
+                <div class="doc-info">
+                    <div class="doc-title" onclick="previewDocument(${doc.document_id})" style="cursor:pointer;color:var(--primary)">${escHtml(doc.title)}</div>
+                    <div class="doc-meta">${doc.chunk_count} 个片段 · ${doc.source_type.toUpperCase()}${date ? ' · ' + date : ''}</div>
+                </div>
+                <button class="btn-delete-doc" onclick="deleteDocument(${doc.document_id}, '${escHtml(doc.title)}')" title="删除文档">✕</button>
+            </div>`;
+        }).join('');
+    }
+
+    function escHtml(s) {
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // ===== Document Management =====
+    async function deleteDocument(documentId, title) {
+        if (!confirm(`确定要删除文档"${title}"吗？此操作不可撤销。`)) {
+            return;
+        }
+
+        try {
+            const resp = await authFetch(`/api/v1/documents/${documentId}`, {
+                method: 'DELETE',
+            });
+
+            if (!resp.ok) {
+                if (resp.status === 401) return;
+                const err = await resp.json();
+                const msg = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail || err);
+                throw new Error(msg || '删除失败');
+            }
+
+            // 从列表中移除
+            state.documents = state.documents.filter(doc => doc.document_id !== documentId);
+            updateDocList();
+            toast('文档删除成功', 'success');
+
+            // 如果没有文档了，禁用聊天
+            if (state.documents.length === 0) {
+                chatInput.disabled = true;
+                sendBtn.disabled = true;
+            }
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }
+
+    async function previewDocument(documentId) {
+        try {
+            const resp = await authFetch(`/api/v1/documents/${documentId}/preview`);
+
+            if (!resp.ok) {
+                if (resp.status === 401) return;
+                const err = await resp.json();
+                const msg = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail || err);
+                throw new Error(msg || '预览失败');
+            }
+
+            const data = await resp.json();
+            showPreviewModal(data);
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }
+
+    function showPreviewModal(data) {
+        // 移除已存在的模态框
+        const existingModal = document.querySelector('.modal-overlay');
+        if (existingModal) existingModal.remove();
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>${escHtml(data.title)}</h3>
+                    <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
+                </div>
+                <div class="modal-body">
+                    ${data.chunks.length > 0
+                        ? data.chunks.map(chunk => `
+                            <div class="preview-chunk">
+                                <div class="preview-chunk-header">片段 ${chunk.chunk_index + 1}</div>
+                                <div>${escHtml(chunk.content)}</div>
+                            </div>
+                        `).join('')
+                        : '<div style="text-align:center;color:var(--text-muted);padding:20px;">暂无内容</div>'
+                    }
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+    }
+
+    // ===== Chat =====
+    function resetChat() {
+        chatMessages.innerHTML = '';
+        chatMessages.appendChild(welcomeScreen);
+        welcomeScreen.classList.remove('hidden');
+        chatInput.value = '';
+        chatInput.disabled = true;
+        sendBtn.disabled = true;
+        state.chatHistory = [];
+    }
+
+    // Tips
+    $$('.tip').forEach(tip => {
+        tip.addEventListener('click', () => {
+            chatInput.value = tip.dataset.q;
+            chatInput.focus();
+        });
+    });
+
+    // Auto-resize textarea
+    chatInput.addEventListener('input', () => {
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+    });
+
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    sendBtn.addEventListener('click', sendMessage);
+
+    async function sendMessage() {
+        const question = chatInput.value.trim();
+        if (!question) return;
+
+        // Hide welcome
+        welcomeScreen.classList.add('hidden');
+
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        chatInput.disabled = true;
+        sendBtn.disabled = true;
+
+        // Add user message
+        appendMessage('user', question);
+        state.chatHistory.push({ role: 'user', content: question });
+
+        // Add bot placeholder
+        const botEl = appendMessage('bot', '');
+        const contentEl = botEl.querySelector('.msg-content');
+        contentEl.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+
+        try {
+            const resp = await authFetch('/api/v1/chat/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question,
+                    chat_history: state.chatHistory.slice(0, -1)
+                }),
+            });
+
+            if (!resp.ok) {
+                if (resp.status === 401) return;
+                const err = await resp.json();
+                const msg = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail || err);
+                throw new Error(msg || '请求失败');
+            }
+
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let fullText = '';
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const events = buffer.split('\n\n');
+                buffer = events.pop() || '';
+
+                for (const event of events) {
+                    for (const line of event.split('\n')) {
+                        if (line.startsWith('data: ')) {
+                            const content = line.substring(6);
+                            if (content === '[DONE]') break;
+                            if (content.startsWith('[错误]')) throw new Error(content.substring(4));
+                            fullText += content;
+                        }
+                    }
+                }
+
+                // Render markdown
+                renderBotContent(contentEl, fullText);
+                scrollToBottom();
+            }
+
+            state.chatHistory.push({ role: 'bot', content: fullText });
+
+            // Fetch and display source chunks
+            addSourcesPanel(botEl, question);
+
+        } catch (err) {
+            if (err.message !== 'Unauthorized') {
+                contentEl.innerHTML = `<span style="color:var(--danger)">❌ ${escHtml(err.message)}</span>`;
+            }
+        } finally {
+            chatInput.disabled = false;
+            sendBtn.disabled = false;
+            chatInput.focus();
+            scrollToBottom();
+        }
+    }
+
+    function appendMessage(role, content) {
+        const el = document.createElement('div');
+        el.className = `message ${role}`;
+        el.innerHTML = `
+            <div class="msg-avatar">${role === 'user' ? '👤' : '🤖'}</div>
+            <div class="msg-body">
+                <div class="msg-content">${role === 'user' ? escHtml(content) : ''}</div>
+            </div>
+        `;
+        chatMessages.appendChild(el);
+        scrollToBottom();
+        return el;
+    }
+
+    function renderBotContent(el, text) {
+        if (typeof marked !== 'undefined') {
+            el.innerHTML = marked.parse(text, { breaks: true });
+        } else {
+            el.innerHTML = text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+        }
+    }
+
+    async function addSourcesPanel(msgEl, question) {
+        const body = msgEl.querySelector('.msg-body');
+        const panel = document.createElement('div');
+        panel.className = 'sources-panel';
+
+        // Show loading state
+        panel.innerHTML = `
+            <button class="sources-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+                <span>📎 检索来源 (Top-5)</span>
+                <span class="arrow">▼</span>
+            </button>
+            <div class="sources-list">
+                <div class="source-item" style="text-align:center; color:var(--text-muted); padding:12px;">加载中...</div>
+            </div>
+        `;
+        body.appendChild(panel);
+
+        // Fetch real sources
+        try {
+            const resp = await authFetch('/api/v1/chat/retrieve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question }),
+            });
+
+            if (!resp.ok) {
+                if (resp.status === 401) return;
+                throw new Error('检索失败');
+            }
+            const sources = await resp.json();
+
+            const sourcesList = panel.querySelector('.sources-list');
+            if (sources.length === 0) {
+                sourcesList.innerHTML = '<div class="source-item" style="text-align:center; color:var(--text-muted); padding:12px;">未检索到相关片段</div>';
+            } else {
+                sourcesList.innerHTML = sources.map((src, i) => `
+                    <div class="source-item">
+                        <div class="source-header">
+                            <span>#${i + 1}</span>
+                            <span>片段 ${src.chunk_index} (文档 ID: ${src.document_id})</span>
+                        </div>
+                        <div class="source-text">${escHtml(src.content.length > 200 ? src.content.substring(0, 200) + '...' : src.content)}</div>
+                    </div>
+                `).join('');
+            }
+
+            // Update toggle text with count
+            panel.querySelector('.sources-toggle span:first-child').textContent = `📎 检索来源 (Top-${sources.length})`;
+        } catch (err) {
+            panel.querySelector('.sources-list').innerHTML = `<div class="source-item" style="text-align:center; color:var(--danger); padding:12px;">${escHtml(err.message)}</div>`;
+        }
+    }
+
+    function scrollToBottom() {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // ===== Show App =====
+    function showApp(username) {
+        loginPage.classList.add('hidden');
+        app.classList.remove('hidden');
+        headerUser.textContent = username;
+        chatInput.disabled = false;
+        sendBtn.disabled = false;
+        toast('登录成功', 'success');
+        loadDocuments();
+    }
+
+    // ===== Init =====
+    // Restore session from localStorage
+    const savedToken = localStorage.getItem('rag_token');
+    const savedUsername = localStorage.getItem('rag_username');
+    if (savedToken && savedUsername) {
+        try {
+            const payload = JSON.parse(atob(savedToken.split('.')[1]));
+            if (payload.exp && payload.exp * 1000 > Date.now()) {
+                state.token = savedToken;
+                state.username = savedUsername;
+                state.tenantId = 'default';
+                state.userId = parseInt(payload.sub);
+                showApp(savedUsername);
+            } else {
+                localStorage.removeItem('rag_token');
+                localStorage.removeItem('rag_username');
+            }
+        } catch (e) {
+            localStorage.removeItem('rag_token');
+            localStorage.removeItem('rag_username');
+        }
+    }
+
+    // Check health
+    fetch('/health').then(r => r.ok ? null : toast('服务连接失败', 'error')).catch(() => toast('服务连接失败', 'error'));
+    </script>
+</body>
+</html>
